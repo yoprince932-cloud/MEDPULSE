@@ -1,0 +1,960 @@
+<!DOCTYPE html>
+<html lang="uz">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>MedPulse — Bemorlar Monitoringi</title>
+<link href="https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<style>
+:root{
+  --bg:#f0f4f8;
+  --surface:#ffffff;
+  --surface2:#f7fafc;
+  --border:#e2e8f0;
+  --border2:#cbd5e1;
+  --text:#0f172a;
+  --text2:#475569;
+  --text3:#94a3b8;
+  --accent:#0ea5e9;
+  --accent-d:#0284c7;
+  --red:#ef4444;
+  --red-l:#fee2e2;
+  --orange:#f97316;
+  --orange-l:#ffedd5;
+  --green:#22c55e;
+  --green-l:#dcfce7;
+  --purple:#8b5cf6;
+  --purple-l:#ede9fe;
+  --teal:#14b8a6;
+  --teal-l:#ccfbf1;
+  --font:'Plus Jakarta Sans',sans-serif;
+  --mono:'Space Mono',monospace;
+  --radius:12px;
+  --shadow:0 1px 3px #0000000d,0 1px 2px #0000000d;
+  --shadow-md:0 4px 6px -1px #0000001a,0 2px 4px -1px #0000000f;
+}
+*{margin:0;padding:0;box-sizing:border-box;}
+html,body{height:100%;overflow:hidden;}
+body{background:var(--bg);color:var(--text);font-family:var(--font);font-size:14px;}
+
+/* ── HEADER ── */
+header{
+  display:flex;align-items:center;justify-content:space-between;
+  padding:0 24px;height:56px;background:var(--surface);
+  border-bottom:1px solid var(--border);box-shadow:var(--shadow);
+  position:relative;z-index:50;
+}
+.logo-wrap{display:flex;flex-direction:column;gap:0;}
+.logo{display:flex;align-items:center;gap:10px;}
+.logo-mark{width:32px;height:32px;background:linear-gradient(135deg,#0ea5e9,#0284c7);
+  border-radius:8px;display:flex;align-items:center;justify-content:center;
+  box-shadow:0 0 0 0 #0ea5e944;animation:plogo 2.5s ease-in-out infinite;}
+@keyframes plogo{0%,100%{box-shadow:0 0 0 0 #0ea5e944}50%{box-shadow:0 0 0 8px #0ea5e900}}
+.logo-mark svg{width:18px;height:18px;fill:white;}
+.logo-text{font-size:1.15rem;font-weight:800;color:var(--text);}
+.logo-text span{color:var(--accent);}
+.logo-doctor{font-size:.65rem;color:var(--text3);margin-left:42px;margin-top:-2px;font-weight:500;letter-spacing:.3px;}
+.header-stats{display:flex;gap:0;border:1px solid var(--border);border-radius:10px;overflow:hidden;}
+.hstat{padding:5px 16px;text-align:center;border-right:1px solid var(--border);background:var(--surface);}
+.hstat:last-child{border-right:none;}
+.hstat-num{font-family:var(--mono);font-size:.9rem;font-weight:700;line-height:1.3;}
+.hstat-lbl{font-size:.55rem;letter-spacing:1.2px;color:var(--text3);text-transform:uppercase;}
+.hn-total{color:var(--text);}
+.hn-ok{color:var(--green);}
+.hn-warn{color:var(--orange);}
+.hn-crit{color:var(--red);}
+.header-right{display:flex;align-items:center;gap:12px;}
+.live-badge{display:flex;align-items:center;gap:5px;background:var(--red-l);
+  border:1px solid #fca5a5;border-radius:20px;padding:3px 11px;
+  color:var(--red);font-size:.6rem;font-weight:700;letter-spacing:.5px;}
+.live-dot{width:5px;height:5px;border-radius:50%;background:var(--red);animation:blink 1.2s infinite;}
+@keyframes blink{0%,100%{opacity:1}50%{opacity:.2}}
+#clock{font-family:var(--mono);font-size:.78rem;color:var(--text2);text-align:right;line-height:1.4;}
+#date-str{font-family:var(--mono);font-size:.6rem;color:var(--text3);text-align:right;}
+
+/* ── LAYOUT ── */
+.layout{display:grid;grid-template-columns:272px 1fr;height:calc(100vh - 56px);}
+
+/* ── SIDEBAR ── */
+.sidebar{background:var(--surface);border-right:1px solid var(--border);
+  display:flex;flex-direction:column;overflow:hidden;}
+.sb-top{padding:12px;}
+.sb-search input{width:100%;background:var(--surface2);border:1px solid var(--border);
+  border-radius:8px;padding:7px 12px;color:var(--text);font-family:var(--font);
+  font-size:.78rem;outline:none;transition:border .15s;}
+.sb-search input:focus{border-color:var(--accent);box-shadow:0 0 0 3px #0ea5e920;}
+.sb-search input::placeholder{color:var(--text3);}
+.sb-filter{display:flex;gap:4px;margin-top:8px;}
+.filt-btn{flex:1;padding:5px 4px;border-radius:7px;border:1px solid var(--border);
+  background:transparent;color:var(--text3);font-size:.62rem;font-weight:600;
+  letter-spacing:.3px;cursor:pointer;transition:all .15s;font-family:var(--font);}
+.filt-btn:hover{background:var(--surface2);}
+.filt-btn.fa{background:#eff6ff;border-color:#bfdbfe;color:#1d4ed8;}
+.filt-btn.fo{background:var(--green-l);border-color:#86efac;color:#15803d;}
+.filt-btn.fw{background:var(--orange-l);border-color:#fdba74;color:#c2410c;}
+.filt-btn.fc{background:var(--red-l);border-color:#fca5a5;color:#b91c1c;}
+.sb-list{flex:1;overflow-y:auto;padding-bottom:8px;}
+.sb-list::-webkit-scrollbar{width:4px;}
+.sb-list::-webkit-scrollbar-thumb{background:var(--border2);border-radius:2px;}
+.sb-section-lbl{font-size:.58rem;font-weight:700;letter-spacing:1.5px;color:var(--text3);
+  text-transform:uppercase;padding:10px 14px 5px;}
+.pcard{display:flex;align-items:center;gap:10px;padding:8px 12px;cursor:pointer;
+  border-left:3px solid transparent;transition:all .12s;border-radius:0;}
+.pcard:hover{background:var(--surface2);}
+.pcard.active{background:#eff6ff;border-left-color:var(--accent);}
+.pcard.crit-row.active{background:var(--red-l);border-left-color:var(--red);}
+.av{width:36px;height:36px;border-radius:9px;display:flex;align-items:center;
+  justify-content:center;font-weight:700;font-size:.78rem;flex-shrink:0;}
+.pinfo{flex:1;min-width:0;}
+.pname{font-size:.78rem;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;color:var(--text);}
+.pmeta{font-size:.62rem;color:var(--text3);margin-top:1px;}
+.sdot{width:7px;height:7px;border-radius:50%;flex-shrink:0;}
+.sdot.ok  {background:var(--green);}
+.sdot.warn{background:var(--orange);}
+.sdot.crit{background:var(--red);animation:critpulse 1.4s infinite;}
+@keyframes critpulse{0%,100%{opacity:1;transform:scale(1)}50%{opacity:.5;transform:scale(.7)}}
+
+/* ── MAIN ── */
+.main{overflow-y:auto;padding:20px 24px 28px;background:var(--bg);}
+.main::-webkit-scrollbar{width:4px;}
+.main::-webkit-scrollbar-thumb{background:var(--border2);border-radius:2px;}
+
+/* ── EMPTY ── */
+.empty-state{display:flex;flex-direction:column;align-items:center;justify-content:center;
+  height:68vh;gap:12px;color:var(--text3);}
+.empty-icon{font-size:3.5rem;opacity:.3;}
+.empty-title{font-size:1rem;font-weight:700;color:var(--text2);}
+.empty-sub{font-size:.78rem;text-align:center;line-height:1.7;}
+
+/* ── CARDS ── */
+.card{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);
+  box-shadow:var(--shadow);padding:16px 18px;}
+.card-title{font-size:.6rem;font-weight:700;letter-spacing:1.5px;color:var(--text3);
+  text-transform:uppercase;margin-bottom:10px;}
+
+/* ── PATIENT HEADER ── */
+.ph{display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:16px;gap:12px;flex-wrap:wrap;}
+.ph-left{display:flex;align-items:center;gap:13px;}
+.ph-avatar{width:50px;height:50px;border-radius:12px;display:flex;align-items:center;
+  justify-content:center;font-size:1.1rem;font-weight:800;flex-shrink:0;}
+.ph-name{font-size:1.2rem;font-weight:800;color:var(--text);}
+.ph-sub{font-size:.72rem;color:var(--text2);margin-top:5px;line-height:1.6;}
+.ph-right{display:flex;flex-direction:column;align-items:flex-end;gap:6px;}
+.cond-badge{padding:5px 14px;border-radius:20px;font-size:.65rem;font-weight:700;}
+.cond-ok  {background:var(--green-l);color:#15803d;}
+.cond-warn{background:var(--orange-l);color:#c2410c;}
+.cond-crit{background:var(--red-l);color:#b91c1c;}
+.admitted-lbl{font-size:.62rem;color:var(--text3);font-family:var(--mono);}
+
+/* ── ALERT ── */
+.alert-strip{display:flex;align-items:center;gap:10px;background:#fff1f2;
+  border:1px solid #fca5a5;border-radius:9px;padding:10px 14px;margin-bottom:14px;
+  font-size:.78rem;color:#b91c1c;font-weight:500;}
+
+/* ── VITALS GRID ── */
+.vitals-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:14px;}
+.vital-card{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);
+  box-shadow:var(--shadow);padding:14px 16px;position:relative;overflow:hidden;transition:transform .15s;}
+.vital-card:hover{transform:translateY(-1px);box-shadow:var(--shadow-md);}
+.vc-top-bar{position:absolute;top:0;left:0;right:0;height:3px;border-radius:var(--radius) var(--radius) 0 0;}
+.vc-label{font-size:.58rem;font-weight:700;letter-spacing:1.5px;color:var(--text3);text-transform:uppercase;margin-bottom:7px;}
+.vc-icon{position:absolute;top:12px;right:13px;font-size:1rem;opacity:.25;}
+.vc-value{font-size:1.9rem;font-weight:800;font-family:var(--mono);line-height:1;color:var(--text);}
+.vc-unit{font-size:.6rem;color:var(--text3);margin-top:3px;font-family:var(--mono);}
+.vc-spark{margin-top:7px;}
+.vc-range{font-size:.58rem;color:var(--text3);font-family:var(--mono);margin-top:3px;}
+
+/* ── ECG ── */
+.ecg-wrap{position:relative;}
+.ecg-cv{width:100%;display:block;}
+
+/* ── CHARTS ── */
+.two-col{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:12px;}
+.three-col{display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px;margin-bottom:12px;}
+.panel-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;}
+.panel-val{font-family:var(--mono);font-size:.78rem;font-weight:700;}
+
+/* ── KV ── */
+.kv-row{display:flex;justify-content:space-between;font-size:.75rem;
+  padding:5px 0;border-bottom:1px solid var(--border);}
+.kv-row:last-child{border-bottom:none;}
+.kv-key{color:var(--text2);}
+.kv-val{font-weight:600;font-family:var(--mono);color:var(--text);}
+
+/* ── RING ── */
+.ring-row{display:flex;align-items:center;gap:12px;margin:6px 0 12px;}
+.ring-svg{width:60px;height:60px;flex-shrink:0;}
+.ring-main{font-size:1.3rem;font-weight:800;font-family:var(--mono);}
+.ring-sub{font-size:.63rem;color:var(--text3);margin-top:2px;}
+
+/* ── MED PILLS ── */
+.med-pill{display:inline-flex;align-items:center;gap:5px;background:var(--surface2);
+  border:1px solid var(--border);border-radius:6px;padding:3px 9px;font-size:.65rem;margin:2px 2px 2px 0;color:var(--text2);}
+
+/* ── NOTES ── */
+.note-item{display:flex;gap:8px;font-size:.73rem;padding:5px 0;
+  border-bottom:1px solid var(--border);line-height:1.5;color:var(--text2);}
+.note-item:last-child{border-bottom:none;}
+.note-time{font-family:var(--mono);font-size:.62rem;color:var(--text3);flex-shrink:0;padding-top:1px;}
+
+/* ── HIST TABLE ── */
+.hist-table{width:100%;border-collapse:collapse;font-size:.72rem;}
+.hist-table th{font-size:.55rem;letter-spacing:1.2px;color:var(--text3);text-transform:uppercase;
+  text-align:left;padding:6px 8px;border-bottom:2px solid var(--border);font-family:var(--mono);}
+.hist-table td{padding:5px 8px;border-bottom:1px solid var(--border);font-family:var(--mono);color:var(--text);}
+.hist-table tr:last-child td{border-bottom:none;}
+.hist-table tr:hover td{background:var(--surface2);}
+
+/* ── MAP MODAL ── */
+.map-modal{display:none;position:fixed;inset:0;z-index:1000;background:#00000055;
+  align-items:center;justify-content:center;}
+.map-modal.open{display:flex;}
+.map-box{background:var(--surface);border-radius:16px;box-shadow:0 20px 60px #0000003a;
+  width:min(740px,95vw);padding:0;overflow:hidden;}
+.map-header{display:flex;align-items:center;justify-content:space-between;
+  padding:14px 18px;border-bottom:1px solid var(--border);}
+.map-header-title{font-size:.95rem;font-weight:700;}
+.map-close{background:var(--surface2);border:1px solid var(--border);border-radius:8px;
+  padding:5px 12px;cursor:pointer;font-size:.75rem;font-weight:600;color:var(--text2);
+  transition:all .12s;font-family:var(--font);}
+.map-close:hover{background:var(--red-l);color:var(--red);border-color:#fca5a5;}
+#map-container{height:420px;width:100%;}
+.map-footer{padding:10px 18px;background:var(--surface2);font-size:.73rem;color:var(--text2);}
+.map-btn{display:inline-flex;align-items:center;gap:6px;background:var(--accent);color:#fff;
+  border:none;border-radius:8px;padding:6px 14px;font-size:.75rem;font-weight:600;
+  cursor:pointer;font-family:var(--font);transition:background .15s;}
+.map-btn:hover{background:var(--accent-d);}
+
+/* ── VITAL BADGE INLINE ── */
+.vb{display:inline-block;padding:2px 8px;border-radius:5px;font-size:.6rem;font-weight:700;}
+.vb-ok{background:var(--green-l);color:#15803d;}
+.vb-warn{background:var(--orange-l);color:#c2410c;}
+.vb-crit{background:var(--red-l);color:#b91c1c;}
+</style>
+</head>
+<body>
+
+<!-- MAP MODAL -->
+<div class="map-modal" id="map-modal">
+  <div class="map-box">
+    <div class="map-header">
+      <div>
+        <div class="map-header-title" id="map-title">📍 Bemor joylashuvi</div>
+        <div style="font-size:.68rem;color:var(--text3);margin-top:2px" id="map-addr"></div>
+      </div>
+      <button class="map-close" onclick="closeMap()">✕ Yopish</button>
+    </div>
+    <div id="map-container"></div>
+    <div class="map-footer" id="map-footer">
+      Samarqand shahri ichidagi taxminiy manzil
+    </div>
+  </div>
+</div>
+
+<header>
+  <div class="logo-wrap">
+    <div class="logo">
+      <div class="logo-mark">
+        <svg viewBox="0 0 24 24"><path d="M12 21.593c-5.63-5.539-11-10.297-11-14.402 0-3.791 3.068-5.191 5.281-5.191 1.312 0 4.151.501 5.719 4.457 1.59-3.968 4.464-4.447 5.726-4.447 2.54 0 5.274 1.621 5.274 5.181 0 4.069-5.136 8.625-11 14.402z"/></svg>
+      </div>
+      <div class="logo-text">Med<span>Pulse</span></div>
+    </div>
+    <div class="logo-doctor">Dr. Sirojiddin Baxrinov</div>
+  </div>
+  <div class="header-stats">
+    <div class="hstat"><div class="hstat-num hn-total">30</div><div class="hstat-lbl">Jami</div></div>
+    <div class="hstat"><div class="hstat-num hn-ok" id="hs-ok">—</div><div class="hstat-lbl">Normal</div></div>
+    <div class="hstat"><div class="hstat-num hn-warn" id="hs-warn">—</div><div class="hstat-lbl">Kuzatuv</div></div>
+    <div class="hstat"><div class="hstat-num hn-crit" id="hs-crit">—</div><div class="hstat-lbl">Kritik</div></div>
+  </div>
+  <div class="header-right">
+    <div><div id="clock"></div><div id="date-str"></div></div>
+    <div class="live-badge"><div class="live-dot"></div>JONLI EFIR</div>
+  </div>
+</header>
+
+<div class="layout">
+  <aside class="sidebar">
+    <div class="sb-top">
+      <div class="sb-search">
+        <input type="text" id="srch" placeholder="🔍  Ism bo'yicha…" oninput="renderList()">
+      </div>
+      <div class="sb-filter">
+        <button class="filt-btn fa" onclick="setFilt('all',this)">Barchasi</button>
+        <button class="filt-btn" onclick="setFilt('ok',this)">Normal</button>
+        <button class="filt-btn" onclick="setFilt('warn',this)">Kuzatuv</button>
+        <button class="filt-btn" onclick="setFilt('crit',this)">Kritik</button>
+      </div>
+    </div>
+    <div class="sb-list" id="sb-list"></div>
+  </aside>
+  <main class="main" id="main">
+    <div class="empty-state">
+      <div class="empty-icon">🫀</div>
+      <div class="empty-title">Bemorni tanlang</div>
+      <div class="empty-sub">Monitoring ma'lumotlarini ko'rish uchun<br>chap paneldan bemor tanlang</div>
+    </div>
+  </main>
+</div>
+
+<script>
+// ════════════════════════════════════════════════
+// SAMARKAND COORDS (within city bounds)
+// ════════════════════════════════════════════════
+const SAMARKAND_LOCS = [
+  {lat:39.6542,lng:66.9597,addr:"Registon ko'chasi, 12"},
+  {lat:39.6498,lng:66.9651,addr:"Amir Temur xiyoboni, 5"},
+  {lat:39.6601,lng:66.9520,addr:"Rudakiy ko'chasi, 34"},
+  {lat:39.6470,lng:66.9700,addr:"Universityet xiyoboni, 8"},
+  {lat:39.6580,lng:66.9760,addr:"Mirzo Ulug'bek ko'chasi, 21"},
+  {lat:39.6420,lng:66.9580,addr:"Istiqlol ko'chasi, 7"},
+  {lat:39.6660,lng:66.9650,addr:"Bo'stonsaroy, 15"},
+  {lat:39.6510,lng:66.9490,addr:"Navruz ko'chasi, 3"},
+  {lat:39.6530,lng:66.9830,addr:"Chilonzor, 45"},
+  {lat:39.6440,lng:66.9450,addr:"Sharof Rashidov ko'chasi, 18"},
+  {lat:39.6610,lng:66.9580,addr:"Sadriddin Ayniy ko'chasi, 9"},
+  {lat:39.6490,lng:66.9720,addr:"Mirzo Ulug'bek, 56"},
+  {lat:39.6560,lng:66.9430,addr:"Yangi Shahar, 22"},
+  {lat:39.6380,lng:66.9640,addr:"Pastdarg'om tumani, 11"},
+  {lat:39.6710,lng:66.9700,addr:"Bog'ishamol, 8"},
+  {lat:39.6460,lng:66.9810,addr:"Qo'shtepa, 19"},
+  {lat:39.6590,lng:66.9900,addr:"Zarafshon ko'chasi, 33"},
+  {lat:39.6340,lng:66.9560,addr:"Katta Yo'l, 7"},
+  {lat:39.6650,lng:66.9480,addr:"Dehqonobod, 14"},
+  {lat:39.6520,lng:66.9610,addr:"Markaziy ko'cha, 2"},
+  {lat:39.6480,lng:66.9540,addr:"Narpay ko'chasi, 30"},
+  {lat:39.6430,lng:66.9680,addr:"Ko'hna Samarqand, 5"},
+  {lat:39.6570,lng:66.9750,addr:"Siob bozori, 12"},
+  {lat:39.6720,lng:66.9610,addr:"Shahrisabz ko'chasi, 25"},
+  {lat:39.6390,lng:66.9500,addr:"Oq tepa, 8"},
+  {lat:39.6640,lng:66.9550,addr:"Ko'k Saroy, 17"},
+  {lat:39.6500,lng:66.9870,addr:"Imorat ko'chasi, 41"},
+  {lat:39.6360,lng:66.9720,addr:"Qorasuv, 6"},
+  {lat:39.6690,lng:66.9780,addr:"Yangiobod, 13"},
+  {lat:39.6550,lng:66.9680,addr:"Universitetskaya, 3"},
+];
+
+// ════════════════════════════════════════════════
+// PATIENTS
+// ════════════════════════════════════════════════
+const RAW = [
+  {id:1, fn:"Aliyev",      ln:"Jasur",        age:45,g:"Erkak",ward:"Kardiologiya",    bed:"2A",diag:"Gipertenziya",              bpmB:80, spo2B:96,tB:37.2,bpS:130,bpD:85, meds:["Lisinopril 10mg","Aspirin 75mg"],       notes:["Kecha bosim ko'tarildi","Dori vaqtida qabul qilindi"]},
+  {id:2, fn:"Ergashev",    ln:"Behruz",        age:22,g:"Erkak",ward:"Travmatologiya",  bed:"7C",diag:"Boldir suyagi sinishi",      bpmB:66, spo2B:99,tB:36.7,bpS:112,bpD:70, meds:["Ibuprofen 400mg","Calcium D3"],         notes:["Op'dan keyin 3-kun","Tikuvlar yaxshi bitmoqda"]},
+  {id:3, fn:"Hasanov",     ln:"Dilshod",       age:38,g:"Erkak",ward:"Terapiya",        bed:"4B",diag:"O'tkir bronxit",             bpmB:72, spo2B:97,tB:37.4,bpS:118,bpD:76, meds:["Amoksitsillin 500mg","Bromgeksin"],      notes:["Yo'tal kamaymoqda","Umumiy holat yaxshilandi"]},
+  {id:4, fn:"Holiqova",    ln:"Nargiza",       age:50,g:"Ayol", ward:"Endokrinologiya", bed:"3A",diag:"Qandli diabet 2-tur",       bpmB:88, spo2B:95,tB:37.8,bpS:136,bpD:89, meds:["Metformin 850mg","Insulin"],             notes:["Glyukoza 7.8 mmol/L","Dieta nazoratda"]},
+  {id:5, fn:"Islomov",     ln:"Akbar",         age:60,g:"Erkak",ward:"Kardiologiya",    bed:"1B",diag:"Stenokardiya",              bpmB:76, spo2B:95,tB:37.0,bpS:138,bpD:88, meds:["Nitroglitserin","Beta-bloker"],          notes:["Stress testidan o'tdi","Koronarografiya rejalashtirilgan"]},
+  {id:6, fn:"Karimov",     ln:"Mansur",        age:54,g:"Erkak",ward:"Nevrologiya",     bed:"6A",diag:"TIA (o'tkinchi ishemiya)",  bpmB:86, spo2B:95,tB:37.5,bpS:148,bpD:92, meds:["Aspikardin","Aktovegin"],               notes:["Nutq biroz buzilgan","Nevropatolog kuzatmoqda"]},
+  {id:7, fn:"Mamatov",     ln:"Salim",         age:63,g:"Erkak",ward:"Xirurgiya",       bed:"5B",diag:"Appenditsit (post-op)",    bpmB:70, spo2B:98,tB:37.1,bpS:116,bpD:74, meds:["Amoksitsillin","Ketoprofen"],            notes:["Operatsiya muvaffaqiyatli","Umumiy holat barqaror"]},
+  {id:8, fn:"Mirzayev",    ln:"Otabek",        age:35,g:"Erkak",ward:"Xirurgiya",       bed:"6B",diag:"Post-op reabilitatsiya",   bpmB:72, spo2B:97,tB:36.9,bpS:115,bpD:75, meds:["Vitamin B","Ibuprofen 200mg"],           notes:["Erta faollashtirish boshlandi","Fizioterapiya tayinlandi"]},
+  {id:9, fn:"Nazarov",     ln:"Firdavs",       age:41,g:"Erkak",ward:"Pulmonologiya",   bed:"4A",diag:"Bronxial astma",           bpmB:86, spo2B:94,tB:37.3,bpS:126,bpD:81, meds:["Salbutamol inhaler","Montelukast"],       notes:["Tutqich kechasi bo'ldi","Uyqu sifati pasaygan"]},
+  {id:10,fn:"Qodirov",     ln:"Sherzod",       age:58,g:"Erkak",ward:"Kardiologiya",    bed:"3B",diag:"Yurak yetishmovchiligi",   bpmB:82, spo2B:96,tB:37.4,bpS:140,bpD:88, meds:["Furosemid","Spironolakton"],             notes:["Oyoqlarda engil shish","Ekxokardiografiya tayinlandi"]},
+  {id:11,fn:"Qosimova",    ln:"Zulfiya",       age:29,g:"Ayol", ward:"Ginekologiya",    bed:"2D",diag:"Anemiya",                  bpmB:74, spo2B:98,tB:36.8,bpS:108,bpD:68, meds:["Ferrum Lek","Foliy kislota"],            notes:["Gemoglobin 98 g/L","Ovqatlanish rejimi tuzildi"]},
+  {id:12,fn:"Rahimova",    ln:"Malika",        age:32,g:"Ayol", ward:"Terapiya",        bed:"5C",diag:"ORVI",                     bpmB:69, spo2B:98,tB:37.5,bpS:111,bpD:71, meds:["Paratsetamol","Vitamin C"],              notes:["Harorat me'yorlashdi","3 kunda yaxshilanish kutilmoqda"]},
+  {id:13,fn:"Rashidova",   ln:"Lobar",         age:47,g:"Ayol", ward:"Endokrinologiya", bed:"3C",diag:"Gipotireoz",               bpmB:65, spo2B:98,tB:36.6,bpS:110,bpD:70, meds:["Levotiroxin 50mcg"],                     notes:["TSH normallashmoqda","Oylik nazorat"]},
+  {id:14,fn:"Sobirov",     ln:"Hamidjon",      age:73,g:"Erkak",ward:"Geriatriya",      bed:"1A",diag:"Yurak ishemiyasi",         bpmB:78, spo2B:95,tB:37.2,bpS:145,bpD:90, meds:["Klopidogrel","Atorvastatin"],            notes:["EKG o'zgarishlari kuzatilmoqda","Kardiolog bilan maslahat"]},
+  {id:15,fn:"Tojiboyev",   ln:"Anvar",         age:44,g:"Erkak",ward:"Ortopediya",      bed:"8A",diag:"Bel og'rig'i (L4-L5)",    bpmB:68, spo2B:99,tB:36.7,bpS:120,bpD:78, meds:["Diklofenak","Miolastan"],                notes:["MRT natijasi keldi","Fizioterapiya kursi boshlandi"]},
+  {id:16,fn:"Toshmatova",  ln:"Dilnoza",       age:27,g:"Ayol", ward:"Nevrologiya",     bed:"1D",diag:"Migren",                   bpmB:62, spo2B:99,tB:36.8,bpS:105,bpD:65, meds:["Sumatriptan","Magnesium"],               notes:["Og'riq hujumi kamaydi","Uyqu normallashdi"]},
+  {id:17,fn:"Tursunov",    ln:"Jahongir",      age:39,g:"Erkak",ward:"Gastroenterologiya",bed:"9B",diag:"Gastrit (H.pylori+)",    bpmB:78, spo2B:97,tB:37.1,bpS:122,bpD:80, meds:["Omeprazol 20mg","Amoksitsillin"],        notes:["H.pylori eradikatsiyasi boshlandi","Dieta nazoratda"]},
+  {id:18,fn:"Umarov",      ln:"Bobur",         age:31,g:"Erkak",ward:"Terapiya",         bed:"5A",diag:"Zotiljam",                bpmB:90, spo2B:93,tB:38.5,bpS:128,bpD:84, meds:["Tseftriakson IV","Azitromitsin"],         notes:["SpO2 kuzatuvda","KT tekshiruvi rejalashtirilgan"]},
+  {id:19,fn:"Usmonov",     ln:"Sarvar",        age:52,g:"Erkak",ward:"Urologiya",        bed:"10A",diag:"Buyrak toshi",           bpmB:70, spo2B:98,tB:36.9,bpS:118,bpD:76, meds:["No-shpa","Ko'p suyuqlik"],               notes:["Tosh 4mm","Spontan chiqish ehtimoli yuqori"]},
+  {id:20,fn:"Xolmatova",   ln:"Sevinch",       age:24,g:"Ayol", ward:"Ginekologiya",     bed:"2C",diag:"Salpingit",              bpmB:84, spo2B:96,tB:37.9,bpS:114,bpD:72, meds:["Metronidazol IV","Doksitsiklin"],         notes:["Yallig'lanish pasaymoqda","Antibiotik kursi 7 kun"]},
+  {id:21,fn:"Xoshimov",    ln:"Laziz",         age:36,g:"Erkak",ward:"Kardiologiya",     bed:"2B",diag:"Aritmiya (AF)",          bpmB:88, spo2B:96,tB:37.0,bpS:128,bpD:82, meds:["Varfarin","Bisoprolol"],                  notes:["INR 2.1 maqsadda","Holter monitoring boshlandi"]},
+  {id:22,fn:"Yusupova",    ln:"Sabohat",       age:66,g:"Ayol", ward:"Kardiologiya",     bed:"2E",diag:"Aritmiya nazorat",       bpmB:74, spo2B:96,tB:37.1,bpS:138,bpD:86, meds:["Amiodarone","Dabigatran"],                notes:["Ritm barqarorlashdi","Kuzatuv davom etmoqda"]},
+  {id:23,fn:"Zaripov",     ln:"Eldor",         age:48,g:"Erkak",ward:"Gastroenterologiya",bed:"9A",diag:"Surunkali gepatit B",   bpmB:74, spo2B:96,tB:37.0,bpS:122,bpD:78, meds:["Entekavir","Vitamins"],                   notes:["Jigar fermentlari nazoratda","Oylik ultratovush"]},
+  {id:24,fn:"Zokirov",     ln:"Murod",         age:55,g:"Erkak",ward:"Pulmonologiya",    bed:"4C",diag:"YUBT (sil)",             bpmB:82, spo2B:94,tB:37.6,bpS:124,bpD:80, meds:["Izoniazid","Rifampitsin"],                notes:["1-oy OAK yaxshi","Jigar fermentlari nazoratda"]},
+  {id:25,fn:"Abdullayeva", ln:"Mohira",        age:34,g:"Ayol", ward:"Nefrologiya",      bed:"11B",diag:"Surunkali buyrak kasalligi",bpmB:84,spo2B:95,tB:37.2,bpS:142,bpD:90,meds:["Enalapril","Eritropoetin"],              notes:["GFR: 45 ml/min","Suyuqlik nazoratda"]},
+  {id:26,fn:"Azimov",      ln:"Rustam",        age:19,g:"Erkak",ward:"Terapiya",         bed:"5D",diag:"Bakterial angina",       bpmB:78, spo2B:98,tB:37.8,bpS:115,bpD:72, meds:["Amoksiklav","Strepsils"],                 notes:["Harorat pasaymoqda","3-kun antibiotikoterapiyasi"]},
+  {id:27,fn:"Baxtiyorova", ln:"Gulnora",       age:42,g:"Ayol", ward:"Revmatologiya",    bed:"12A",diag:"Revmatoid artrit",      bpmB:76, spo2B:96,tB:37.5,bpS:120,bpD:78, meds:["Metotreksat","Folgamma"],                 notes:["Bo'g'im shishi kamaydi","Oylik nazorat"]},
+  {id:28,fn:"Haydarov",    ln:"Nodir",         age:57,g:"Erkak",ward:"Onkologiya",       bed:"13B",diag:"O'pka o'smasi (II st)",bpmB:82, spo2B:93,tB:37.9,bpS:128,bpD:82, meds:["Karboplatin","Simptomatik"],              notes:["2-kemo kursi tugadi","Umumiy holat barqaror"]},
+  {id:29,fn:"Inomova",     ln:"Feruza",        age:26,g:"Ayol", ward:"Ginekologiya",     bed:"2F",diag:"Homiladorlik giperten.",bpmB:84, spo2B:96,tB:37.0,bpS:140,bpD:90, meds:["Magniy sulfat IV","Metildopa"],            notes:["CTG normal","Bolani kuzatish kuchaytirildi"]},
+  {id:30,fn:"Jurayev",     ln:"Timur",         age:43,g:"Erkak",ward:"Kardiologiya",     bed:"3C",diag:"Miokard infarkti (post)",bpmB:82,spo2B:95,tB:37.3,bpS:138,bpD:86, meds:["Tikagelor","Atorvastatin 80mg"],          notes:["Troponin pasaymoqda","Stent operatsiyasi muvaffaqiyatli"]},
+];
+
+// Assign locations
+RAW.forEach((p,i)=>{ p.loc = SAMARKAND_LOCS[i]; });
+
+// Initial status: max 2 critical, rest distributed
+function assignStatuses() {
+  const ids = RAW.map(p=>p.id);
+  // shuffle
+  for(let i=ids.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[ids[i],ids[j]]=[ids[j],ids[i]];}
+  const critCount = Math.floor(Math.random()*2)+1; // 1 or 2
+  const warnCount = Math.floor(Math.random()*8)+6; // 6-13
+  ids.forEach((id,i)=>{
+    const p = RAW.find(x=>x.id===id);
+    if(i<critCount) p.status='crit';
+    else if(i<critCount+warnCount) p.status='warn';
+    else p.status='ok';
+  });
+}
+assignStatuses();
+
+// Sort by last name
+RAW.sort((a,b)=>(a.fn+a.ln).localeCompare(b.fn+b.ln,'uz'));
+
+const PALETTE = ["#0ea5e9","#ef4444","#22c55e","#f97316","#8b5cf6",
+                 "#14b8a6","#ec4899","#f59e0b","#06b6d4","#84cc16",
+                 "#6366f1","#10b981","#f43f5e","#3b82f6","#a855f7"];
+
+// ════════════════════════════════════════════════
+// LIVE DATA
+// ════════════════════════════════════════════════
+const LD = {};
+RAW.forEach(p=>{
+  LD[p.id]={
+    bpmH:  Array.from({length:40},()=>p.bpmB+Math.round((Math.random()-.5)*4)),
+    spo2H: Array.from({length:40},()=>Math.min(100,Math.max(85,p.spo2B+Math.round((Math.random()-.5)*2)))),
+    tH:    Array.from({length:10},()=>+(p.tB+(Math.random()-.5)*.3).toFixed(1)),
+    bpSH:  Array.from({length:10},()=>p.bpS+Math.round((Math.random()-.5)*6)),
+    bpDH:  Array.from({length:10},()=>p.bpD+Math.round((Math.random()-.5)*4)),
+    ecg:   [],
+    ecgPhase: Math.random()*Math.PI*2,
+    admitDate: randomAdmit(),
+  };
+  // Pre-fill ECG
+  for(let i=0;i<300;i++) LD[p.id].ecg.push(ecgPt(i,p.bpmB,LD[p.id].ecgPhase));
+});
+
+function ecgPt(i,bpm,phase){
+  const period = Math.max(20,Math.round(6000/bpm));
+  const t = ((i+Math.round(phase*period/(2*Math.PI))) % period)/period;
+  let v=0;
+  if(t>.25&&t<.27)  v=.5;
+  else if(t>.27&&t<.30) v=2.8*(1-Math.abs(t-.285)/.015);
+  else if(t>.30&&t<.33) v=-1.0*(1-Math.abs(t-.315)/.015);
+  else if(t>.33&&t<.37) v=.35*(1-Math.abs(t-.35)/.02);
+  else if(t>.50&&t<.62) v=.28*Math.sin((t-.50)/.12*Math.PI);
+  return v+(Math.random()-.5)*.06;
+}
+
+function randomAdmit(){
+  const d=new Date(); d.setDate(d.getDate()-Math.floor(Math.random()*14+1));
+  return d.toLocaleDateString('uz-UZ',{day:'2-digit',month:'2-digit',year:'numeric'});
+}
+
+// ════════════════════════════════════════════════
+// DYNAMIC CRIT ROTATION (every 40–80 sec)
+// ════════════════════════════════════════════════
+function rotateCrit(){
+  // 1–4 critical at any time
+  const n = Math.random()<.7 ? Math.floor(Math.random()*2)+1 : Math.floor(Math.random()*2)+3;
+  const ids = RAW.map(p=>p.id);
+  for(let i=ids.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[ids[i],ids[j]]=[ids[j],ids[i]];}
+  RAW.forEach(p=>p.status='ok');
+  for(let i=0;i<Math.min(n,4);i++){
+    const p=RAW.find(x=>x.id===ids[i]); if(p) p.status='crit';
+  }
+  const wn=Math.floor(Math.random()*7)+5;
+  let w=0;
+  for(let i=n;i<ids.length&&w<wn;i++){
+    const p=RAW.find(x=>x.id===ids[i]);
+    if(p&&p.status==='ok'){p.status='warn';w++;}
+  }
+  updateHeaderStats();
+  renderList();
+  // re-draw sidebar dot if selected
+}
+setInterval(rotateCrit, 50000 + Math.random()*30000);
+
+// ════════════════════════════════════════════════
+// CLOCK
+// ════════════════════════════════════════════════
+function updateClock(){
+  const n=new Date();
+  document.getElementById('clock').textContent=n.toLocaleTimeString('uz-UZ',{hour:'2-digit',minute:'2-digit',second:'2-digit'});
+  document.getElementById('date-str').textContent=n.toLocaleDateString('uz-UZ',{weekday:'short',day:'2-digit',month:'short'});
+}
+setInterval(updateClock,1000); updateClock();
+
+function updateHeaderStats(){
+  document.getElementById('hs-ok').textContent  = RAW.filter(p=>p.status==='ok').length;
+  document.getElementById('hs-warn').textContent= RAW.filter(p=>p.status==='warn').length;
+  document.getElementById('hs-crit').textContent= RAW.filter(p=>p.status==='crit').length;
+}
+updateHeaderStats();
+
+// ════════════════════════════════════════════════
+// SIDEBAR
+// ════════════════════════════════════════════════
+let filtMode='all', selId=null, raf=null, lastTick=0;
+
+function setFilt(m,btn){
+  filtMode=m;
+  document.querySelectorAll('.filt-btn').forEach(b=>b.className='filt-btn');
+  const map={all:'fa',ok:'fo',warn:'fw',crit:'fc'};
+  btn.className='filt-btn '+map[m];
+  renderList();
+}
+
+function renderList(){
+  const q=(document.getElementById('srch').value||'').toLowerCase();
+  const list=RAW.filter(p=>{
+    const nm=(p.fn+' '+p.ln).toLowerCase();
+    if(q&&!nm.includes(q))return false;
+    if(filtMode!=='all'&&p.status!==filtMode)return false;
+    return true;
+  });
+  const statusOrder={crit:0,warn:1,ok:2};
+  list.sort((a,b)=>statusOrder[a.status]-statusOrder[b.status]||(a.fn+a.ln).localeCompare(b.fn+b.ln,'uz'));
+
+  const html=list.map(p=>{
+    const i=RAW.indexOf(p), col=PALETTE[i%PALETTE.length];
+    return `<div class="pcard${p.status==='crit'?' crit-row':''}${selId===p.id?' active':''}"
+      onclick="selectPatient(${p.id})" data-pid="${p.id}">
+      <div class="av" style="background:${col}20;color:${col}">${p.fn[0]}${p.ln[0]}</div>
+      <div class="pinfo">
+        <div class="pname">${p.fn} ${p.ln}</div>
+        <div class="pmeta">${p.age}y · ${p.ward}</div>
+      </div>
+      <div class="sdot ${p.status}"></div>
+    </div>`;
+  }).join('');
+  document.getElementById('sb-list').innerHTML=`<div class="sb-section-lbl">${list.length} ta bemor</div>${html}`;
+}
+renderList();
+
+// ════════════════════════════════════════════════
+// SELECT PATIENT
+// ════════════════════════════════════════════════
+function selectPatient(id){
+  selId=id;
+  if(raf) cancelAnimationFrame(raf);
+  lastTick=0;
+  renderList();
+  buildDash(id);
+  raf=requestAnimationFrame(animLoop);
+}
+
+const condLabel={ok:'BARQAROR',warn:'KUZATUV',crit:'KRITIK HOLAT'};
+
+function buildDash(id){
+  const p=RAW.find(x=>x.id===id);
+  const d=LD[id];
+  const idx=RAW.indexOf(p), col=PALETTE[idx%PALETTE.length];
+  const bpm=d.bpmH[d.bpmH.length-1];
+  const spo2=d.spo2H[d.spo2H.length-1];
+  const temp=d.tH[d.tH.length-1];
+  const bpS=d.bpSH[d.bpSH.length-1];
+  const bpD=d.bpDH[d.bpDH.length-1];
+  const stayD=Math.floor((new Date()-new Date(d.admitDate.split('.').reverse().join('-')))/86400000)+1;
+
+  const alertHtml=p.status==='crit'?`<div class="alert-strip">
+    <span style="font-size:1rem">🚨</span>
+    <span><b>SHOSHILINCH:</b> Bemor kritik holatda — tibbiy brigada chaqirilishi kerak!</span>
+    <button class="map-btn" style="margin-left:auto;font-size:.68rem;padding:4px 12px" onclick="openMap(${id})">📍 Manzilni ko'rish</button>
+  </div>`:'';
+
+  const medsHtml=p.meds.map((m,i)=>{
+    const c=PALETTE[(i+4)%PALETTE.length];
+    return `<span class="med-pill"><span style="width:5px;height:5px;border-radius:50%;background:${c};display:inline-block"></span>${m}</span>`;
+  }).join('');
+  const notesHtml=p.notes.map(n=>{
+    const t=new Date(); t.setHours(t.getHours()-Math.floor(Math.random()*6+1));
+    return `<div class="note-item"><span class="note-time">${t.getHours().toString().padStart(2,'0')}:${t.getMinutes().toString().padStart(2,'0')}</span><span>${n}</span></div>`;
+  }).join('');
+
+  document.getElementById('main').innerHTML=`
+    <div class="ph">
+      <div class="ph-left">
+        <div class="ph-avatar" style="background:${col}20;color:${col}">${p.fn[0]}${p.ln[0]}</div>
+        <div>
+          <div class="ph-name">${p.fn} ${p.ln}</div>
+          <div class="ph-sub">${p.age} yosh &nbsp;·&nbsp; ${p.g} &nbsp;·&nbsp; ${p.ward}, o'rin ${p.bed} &nbsp;·&nbsp; <b>${p.diag}</b> &nbsp;·&nbsp; ${stayD}-kun</div>
+        </div>
+      </div>
+      <div class="ph-right">
+        <div class="cond-badge cond-${p.status}">${condLabel[p.status]}</div>
+        <div class="admitted-lbl">Qabul: ${d.admitDate}</div>
+        <button class="map-btn" onclick="openMap(${id})" style="font-size:.68rem;padding:4px 12px">📍 Manzil</button>
+      </div>
+    </div>
+    ${alertHtml}
+
+    <!-- VITALS -->
+    <div class="vitals-grid" style="margin-bottom:12px">
+      <div class="vital-card">
+        <div class="vc-top-bar" style="background:#ef4444"></div>
+        <div class="vc-label">Yurak urishi</div>
+        <div class="vc-icon">♥</div>
+        <div class="vc-value" id="v-bpm" style="color:#ef4444">${bpm}</div>
+        <div class="vc-unit">zarbalar / daqiqa</div>
+        <canvas class="vc-spark" id="sp-bpm" height="22"></canvas>
+        <div class="vc-range" id="r-bpm">min ${Math.min(...d.bpmH)} · maks ${Math.max(...d.bpmH)}</div>
+      </div>
+      <div class="vital-card">
+        <div class="vc-top-bar" style="background:#0ea5e9"></div>
+        <div class="vc-label">SpO₂</div>
+        <div class="vc-icon">💧</div>
+        <div class="vc-value" id="v-spo2" style="color:#0ea5e9">${spo2}%</div>
+        <div class="vc-unit">kislorod to'yinganligi</div>
+        <canvas class="vc-spark" id="sp-spo2" height="22"></canvas>
+        <div class="vc-range" id="r-spo2">min ${Math.min(...d.spo2H)} · maks ${Math.max(...d.spo2H)}</div>
+      </div>
+      <div class="vital-card">
+        <div class="vc-top-bar" style="background:#f97316"></div>
+        <div class="vc-label">Harorat</div>
+        <div class="vc-icon">🌡</div>
+        <div class="vc-value" id="v-temp" style="color:#f97316">${temp}°C</div>
+        <div class="vc-unit">tana harorati</div>
+        <canvas class="vc-spark" id="sp-temp" height="22"></canvas>
+        <div class="vc-range" id="r-temp">min ${Math.min(...d.tH).toFixed(1)} · maks ${Math.max(...d.tH).toFixed(1)}</div>
+      </div>
+      <div class="vital-card">
+        <div class="vc-top-bar" style="background:#22c55e"></div>
+        <div class="vc-label">Qon bosimi</div>
+        <div class="vc-icon">📊</div>
+        <div class="vc-value" id="v-bp" style="color:#22c55e">${bpS}/${bpD}</div>
+        <div class="vc-unit">mmHg sistolik / diastolik</div>
+        <canvas class="vc-spark" id="sp-bp" height="22"></canvas>
+        <div class="vc-range" id="r-bp">sys ${Math.min(...d.bpSH)}–${Math.max(...d.bpSH)}</div>
+      </div>
+    </div>
+
+    <!-- ECG -->
+    <div class="card" style="margin-bottom:12px">
+      <div class="panel-head">
+        <span class="card-title" style="margin-bottom:0">EKG — REAL VAQT MONITORI</span>
+        <span class="panel-val" style="color:#ef4444" id="ecg-lbl">${bpm} BPM</span>
+      </div>
+      <canvas id="ecg-cv" height="72"></canvas>
+    </div>
+
+    <!-- CHARTS -->
+    <div class="two-col">
+      <div class="card">
+        <div class="panel-head">
+          <span class="card-title" style="margin-bottom:0">YURAK URISHI TARIXI</span>
+          <span class="panel-val" style="color:#ef4444" id="ch-bpm-v">${bpm} bpm</span>
+        </div>
+        <canvas id="ch-bpm" height="90"></canvas>
+      </div>
+      <div class="card">
+        <div class="panel-head">
+          <span class="card-title" style="margin-bottom:0">SpO₂ TARIXI</span>
+          <span class="panel-val" style="color:#0ea5e9" id="ch-spo2-v">${spo2}%</span>
+        </div>
+        <canvas id="ch-spo2" height="90"></canvas>
+      </div>
+    </div>
+
+    <div class="two-col">
+      <div class="card">
+        <div class="panel-head">
+          <span class="card-title" style="margin-bottom:0">HARORAT TARIXI</span>
+          <span class="panel-val" style="color:#f97316" id="ch-temp-v">${temp}°C</span>
+        </div>
+        <canvas id="ch-temp" height="90"></canvas>
+      </div>
+      <div class="card">
+        <div class="panel-head">
+          <span class="card-title" style="margin-bottom:0">QON BOSIMI TARIXI</span>
+          <span class="panel-val" style="color:#22c55e" id="ch-bp-v">${bpS}/${bpD}</span>
+        </div>
+        <canvas id="ch-bp" height="90"></canvas>
+      </div>
+    </div>
+
+    <!-- INFO ROW -->
+    <div class="three-col">
+      <div class="card">
+        <div class="card-title">Bemor ma'lumotlari</div>
+        <div class="kv-row"><span class="kv-key">F.I.O</span><span class="kv-val">${p.fn} ${p.ln}</span></div>
+        <div class="kv-row"><span class="kv-key">Yoshi</span><span class="kv-val">${p.age}</span></div>
+        <div class="kv-row"><span class="kv-key">Jinsi</span><span class="kv-val">${p.g}</span></div>
+        <div class="kv-row"><span class="kv-key">Bo'lim</span><span class="kv-val">${p.ward}</span></div>
+        <div class="kv-row"><span class="kv-key">O'rin raqami</span><span class="kv-val">${p.bed}</span></div>
+        <div class="kv-row"><span class="kv-key">Yotqizilgan</span><span class="kv-val">${d.admitDate}</span></div>
+        <div class="kv-row"><span class="kv-key">Kun soni</span><span class="kv-val">${stayD} kun</span></div>
+        <div class="kv-row"><span class="kv-key">Manzil</span><span class="kv-val" style="font-size:.65rem">${p.loc.addr}</span></div>
+      </div>
+      <div class="card">
+        <div class="card-title">SpO₂ ko'rsatgich</div>
+        <div class="ring-row">
+          <svg class="ring-svg" viewBox="0 0 60 60">
+            <circle cx="30" cy="30" r="24" fill="none" stroke="#e2e8f0" stroke-width="5"/>
+            <circle cx="30" cy="30" r="24" fill="none" stroke="#0ea5e9" stroke-width="5"
+              stroke-dasharray="150.8" id="spo2-arc"
+              stroke-dashoffset="${150.8-150.8*(spo2/100)}"
+              stroke-linecap="round" transform="rotate(-90 30 30)"/>
+          </svg>
+          <div>
+            <div class="ring-main" style="color:#0ea5e9" id="ring-spo2">${spo2}%</div>
+            <div class="ring-sub">${spo2>=95?'✅ Yaxshi':spo2>=90?'⚠️ Qisman past':'🚨 Past darajada'}</div>
+          </div>
+        </div>
+        <div class="card-title" style="margin-top:10px">Ko'rsatkichlar baholash</div>
+        ${vBadge('BPM',bpm,60,100,'#ef4444')}
+        ${vBadge('SpO₂',spo2,95,100,'#0ea5e9')}
+        ${vBadge('Harorat',temp,36.1,37.5,'#f97316',true)}
+        ${vBadge('Sys BP',bpS,90,130,'#22c55e')}
+      </div>
+      <div class="card">
+        <div class="card-title">Dori-darmonlar</div>
+        <div style="margin-bottom:12px">${medsHtml}</div>
+        <div class="card-title">Tibbiy qaydlar</div>
+        ${notesHtml}
+      </div>
+    </div>
+
+    <!-- HISTORY TABLE -->
+    <div class="card" style="margin-bottom:14px">
+      <div class="card-title">So'nggi o'lchov tarixi (real vaqt)</div>
+      <table class="hist-table"><thead><tr>
+        <th>Vaqt</th><th style="color:#ef4444">BPM</th><th style="color:#0ea5e9">SpO₂</th>
+        <th style="color:#f97316">Harorat</th><th style="color:#22c55e">Bosim</th><th>Holat</th>
+      </tr></thead><tbody id="hist-tbody"></tbody></table>
+    </div>
+  `;
+  buildHistTable(id);
+  drawAllCharts();
+}
+
+function vBadge(lbl,val,lo,hi,col,isF=false){
+  const v=isF?+val:val;
+  const ok=v>=lo&&v<=hi;
+  const cl=ok?'vb-ok':'vb-warn';
+  return `<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:5px;font-size:.73rem;">
+    <span style="color:${col};font-weight:600">${lbl}: ${val}</span>
+    <span class="vb ${cl}">${ok?'Norma':'Diqqat'}</span>
+  </div>`;
+}
+
+// ════════════════════════════════════════════════
+// ANIMATION LOOP
+// ════════════════════════════════════════════════
+const TICK=3000; // 3 seconds between data ticks
+
+function animLoop(ts){
+  if(selId===null){return;}
+  raf=requestAnimationFrame(animLoop);
+
+  // ECG scrolls every frame
+  const p=RAW.find(x=>x.id===selId);
+  const d=LD[selId];
+  d.ecgPhase=(d.ecgPhase||0)+0.012;
+  d.ecg.shift();
+  d.ecg.push(ecgPt(d.ecg.length,p.bpmB,d.ecgPhase));
+  drawEcg();
+
+  // Data tick every 3s
+  if(ts-lastTick>TICK){
+    lastTick=ts;
+    d.bpmH.push(Math.min(180,Math.max(40,p.bpmB+Math.round((Math.random()-.5)*6))));
+    if(d.bpmH.length>40)d.bpmH.shift();
+    d.spo2H.push(Math.min(100,Math.max(85,p.spo2B+Math.round((Math.random()-.5)*2))));
+    if(d.spo2H.length>40)d.spo2H.shift();
+    d.tH.push(+(p.tB+(Math.random()-.5)*.4).toFixed(1));
+    if(d.tH.length>10)d.tH.shift();
+    d.bpSH.push(p.bpS+Math.round((Math.random()-.5)*8));
+    if(d.bpSH.length>10)d.bpSH.shift();
+    d.bpDH.push(p.bpD+Math.round((Math.random()-.5)*5));
+    if(d.bpDH.length>10)d.bpDH.shift();
+    refreshVals();
+    drawAllCharts();
+    buildHistTable(selId);
+  }
+}
+
+function refreshVals(){
+  const d=LD[selId];
+  const bpm=d.bpmH[d.bpmH.length-1];
+  const spo2=d.spo2H[d.spo2H.length-1];
+  const temp=d.tH[d.tH.length-1];
+  const bpS=d.bpSH[d.bpSH.length-1];
+  const bpD=d.bpDH[d.bpDH.length-1];
+  const set=(id,v)=>{const e=document.getElementById(id);if(e)e.textContent=v;};
+  set('v-bpm',bpm); set('v-spo2',spo2+'%'); set('v-temp',temp+'°C'); set('v-bp',bpS+'/'+bpD);
+  set('ecg-lbl',bpm+' BPM'); set('ch-bpm-v',bpm+' bpm');
+  set('ch-spo2-v',spo2+'%'); set('ch-temp-v',temp+'°C'); set('ch-bp-v',bpS+'/'+bpD);
+  set('ring-spo2',spo2+'%');
+  set('r-bpm',`min ${Math.min(...d.bpmH)} · maks ${Math.max(...d.bpmH)}`);
+  set('r-spo2',`min ${Math.min(...d.spo2H)} · maks ${Math.max(...d.spo2H)}`);
+  set('r-temp',`min ${Math.min(...d.tH).toFixed(1)} · maks ${Math.max(...d.tH).toFixed(1)}`);
+  set('r-bp',`sys ${Math.min(...d.bpSH)}–${Math.max(...d.bpSH)}`);
+  const arc=document.getElementById('spo2-arc');
+  if(arc)arc.setAttribute('stroke-dashoffset',150.8-150.8*(spo2/100));
+}
+
+// ════════════════════════════════════════════════
+// HIST TABLE
+// ════════════════════════════════════════════════
+function buildHistTable(id){
+  const d=LD[id];
+  const tbody=document.getElementById('hist-tbody');
+  if(!tbody)return;
+  const n=new Date(), rows=[];
+  const len=Math.min(d.bpmH.length,d.spo2H.length,d.tH.length,d.bpSH.length);
+  for(let i=len-1;i>=Math.max(0,len-8);i--){
+    const ago=(len-1-i)*3;
+    const t=new Date(n-ago*1000);
+    const bpm=d.bpmH[i], spo2=d.spo2H[i];
+    const temp=d.tH[Math.min(i,d.tH.length-1)];
+    const bpS=d.bpSH[Math.min(i,d.bpSH.length-1)];
+    const bpD=d.bpDH[Math.min(i,d.bpDH.length-1)];
+    const ok=bpm>55&&bpm<105&&spo2>=93;
+    rows.push(`<tr>
+      <td>${t.getHours().toString().padStart(2,'0')}:${t.getMinutes().toString().padStart(2,'0')}:${t.getSeconds().toString().padStart(2,'0')}</td>
+      <td style="color:#ef4444;font-weight:700">${bpm}</td>
+      <td style="color:#0ea5e9;font-weight:700">${spo2}%</td>
+      <td style="color:#f97316;font-weight:700">${temp}°C</td>
+      <td style="color:#22c55e;font-weight:700">${bpS}/${bpD}</td>
+      <td><span class="vb ${ok?'vb-ok':'vb-warn'}">${ok?'Norma':'Diqqat'}</span></td>
+    </tr>`);
+  }
+  tbody.innerHTML=rows.join('');
+}
+
+// ════════════════════════════════════════════════
+// CANVAS UTILS
+// ════════════════════════════════════════════════
+function sparkline(id,data,color){
+  const cv=document.getElementById(id); if(!cv)return;
+  cv.width=cv.offsetWidth||200; cv.height=22;
+  const ctx=cv.getContext('2d');
+  ctx.clearRect(0,0,cv.width,22);
+  if(data.length<2)return;
+  const mn=Math.min(...data),mx=Math.max(...data),rng=mx-mn||1;
+  const pts=data.map((v,i)=>[i/(data.length-1)*cv.width,22-((v-mn)/rng)*18-2]);
+  ctx.strokeStyle=color; ctx.lineWidth=1.5; ctx.lineJoin='round';
+  ctx.beginPath(); pts.forEach(([x,y],i)=>i?ctx.lineTo(x,y):ctx.moveTo(x,y)); ctx.stroke();
+  // fill
+  const g=ctx.createLinearGradient(0,0,0,22);
+  g.addColorStop(0,color+'30'); g.addColorStop(1,color+'00');
+  ctx.fillStyle=g;
+  ctx.beginPath(); ctx.moveTo(0,22);
+  pts.forEach(([x,y])=>ctx.lineTo(x,y));
+  ctx.lineTo(cv.width,22); ctx.closePath(); ctx.fill();
+}
+
+function lineChart(id,data,color,yMin,yMax){
+  const cv=document.getElementById(id); if(!cv)return;
+  cv.width=cv.offsetWidth||400; cv.height=90;
+  const ctx=cv.getContext('2d');
+  ctx.clearRect(0,0,cv.width,90);
+  const rng=yMax-yMin;
+  // light grid
+  ctx.strokeStyle='#e2e8f0'; ctx.lineWidth=1;
+  for(let y=0;y<=4;y++){const py=90-(y/4)*82-4;ctx.beginPath();ctx.moveTo(0,py);ctx.lineTo(cv.width,py);ctx.stroke();}
+  const pts=data.map((v,i)=>[i/(data.length-1)*cv.width,90-((v-yMin)/rng)*82-4]);
+  const g=ctx.createLinearGradient(0,0,0,90);
+  g.addColorStop(0,color+'40'); g.addColorStop(1,color+'00');
+  ctx.fillStyle=g;
+  ctx.beginPath(); ctx.moveTo(0,90); pts.forEach(([x,y])=>ctx.lineTo(x,y));
+  ctx.lineTo(cv.width,90); ctx.closePath(); ctx.fill();
+  ctx.strokeStyle=color; ctx.lineWidth=2; ctx.lineJoin='round';
+  ctx.beginPath(); pts.forEach(([x,y],i)=>i?ctx.lineTo(x,y):ctx.moveTo(x,y)); ctx.stroke();
+  const[lx,ly]=pts[pts.length-1];
+  ctx.beginPath(); ctx.arc(lx,ly,3.5,0,Math.PI*2); ctx.fillStyle=color; ctx.fill();
+  ctx.fillStyle='#94a3b8'; ctx.font='9px Space Mono'; ctx.textAlign='left';
+  ctx.fillText(yMax,3,12); ctx.fillText(yMin,3,84);
+}
+
+function dualChart(id,d1,d2,c1,c2,yMin,yMax){
+  const cv=document.getElementById(id); if(!cv)return;
+  cv.width=cv.offsetWidth||400; cv.height=90;
+  const ctx=cv.getContext('2d');
+  ctx.clearRect(0,0,cv.width,90);
+  const rng=yMax-yMin;
+  ctx.strokeStyle='#e2e8f0'; ctx.lineWidth=1;
+  for(let y=0;y<=4;y++){const py=90-(y/4)*82-4;ctx.beginPath();ctx.moveTo(0,py);ctx.lineTo(cv.width,py);ctx.stroke();}
+  [d1,d2].forEach((data,di)=>{
+    const color=di===0?c1:c2;
+    const pts=data.map((v,i)=>[i/(data.length-1)*cv.width,90-((v-yMin)/rng)*82-4]);
+    const g=ctx.createLinearGradient(0,0,0,90);
+    g.addColorStop(0,color+'30'); g.addColorStop(1,color+'00');
+    ctx.fillStyle=g;
+    ctx.beginPath(); ctx.moveTo(0,90); pts.forEach(([x,y])=>ctx.lineTo(x,y));
+    ctx.lineTo(cv.width,90); ctx.closePath(); ctx.fill();
+    ctx.strokeStyle=color; ctx.lineWidth=2; ctx.lineJoin='round';
+    ctx.beginPath(); pts.forEach(([x,y],i)=>i?ctx.lineTo(x,y):ctx.moveTo(x,y)); ctx.stroke();
+  });
+}
+
+function drawEcg(){
+  if(!selId)return;
+  const cv=document.getElementById('ecg-cv'); if(!cv)return;
+  cv.width=cv.offsetWidth||600; cv.height=72;
+  const ctx=cv.getContext('2d');
+  ctx.clearRect(0,0,cv.width,72);
+  // grid
+  ctx.strokeStyle='#f1f5f9'; ctx.lineWidth=1;
+  for(let x=0;x<cv.width;x+=44){ctx.beginPath();ctx.moveTo(x,0);ctx.lineTo(x,72);ctx.stroke();}
+  for(let y=0;y<72;y+=18){ctx.beginPath();ctx.moveTo(0,y);ctx.lineTo(cv.width,y);ctx.stroke();}
+  const data=LD[selId].ecg;
+  const vis=Math.min(data.length,cv.width);
+  const mn=-1.2,mx=3.2,rng=mx-mn;
+  ctx.strokeStyle='#ef4444'; ctx.lineWidth=1.8;
+  ctx.shadowColor='#ef444440'; ctx.shadowBlur=3;
+  ctx.beginPath();
+  for(let i=0;i<vis;i++){
+    const x=(i/vis)*cv.width;
+    const y=36-(data[data.length-vis+i]-((mn+mx)/2))/rng*60;
+    i?ctx.lineTo(x,y):ctx.moveTo(x,y);
+  }
+  ctx.stroke(); ctx.shadowBlur=0;
+}
+
+function drawAllCharts(){
+  if(!selId)return;
+  const d=LD[selId];
+  sparkline('sp-bpm', d.bpmH, '#ef4444');
+  sparkline('sp-spo2',d.spo2H,'#0ea5e9');
+  sparkline('sp-temp',d.tH,   '#f97316');
+  sparkline('sp-bp',  d.bpSH, '#22c55e');
+  lineChart('ch-bpm', d.bpmH, '#ef4444',40,180);
+  lineChart('ch-spo2',d.spo2H,'#0ea5e9',85,100);
+  lineChart('ch-temp',d.tH,   '#f97316',35.5,40);
+  dualChart('ch-bp',  d.bpSH,d.bpDH,'#22c55e','#14b8a6',50,200);
+}
+
+// ════════════════════════════════════════════════
+// MAP
+// ════════════════════════════════════════════════
+let leafletMap=null, mapMarker=null;
+
+function openMap(id){
+  const p=RAW.find(x=>x.id===id);
+  document.getElementById('map-title').textContent=`📍 ${p.fn} ${p.ln} — joylashuvi`;
+  document.getElementById('map-addr').textContent=`Manzil: ${p.loc.addr}, Samarqand`;
+  document.getElementById('map-footer').innerHTML=
+    `<b>${p.fn} ${p.ln}</b> &nbsp;·&nbsp; ${p.loc.addr} &nbsp;·&nbsp; Samarqand shahri &nbsp;·&nbsp;
+     <a href="https://www.google.com/maps/dir/?api=1&destination=${p.loc.lat},${p.loc.lng}" target="_blank"
+        style="color:var(--accent);font-weight:600">Google Maps orqali yo'l qurish →</a>`;
+  document.getElementById('map-modal').classList.add('open');
+
+  setTimeout(()=>{
+    if(!leafletMap){
+      leafletMap=L.map('map-container').setView([p.loc.lat,p.loc.lng],15);
+      L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{
+        attribution:'© OpenStreetMap',maxZoom:19}).addTo(leafletMap);
+    } else {
+      leafletMap.setView([p.loc.lat,p.loc.lng],15);
+      if(mapMarker) leafletMap.removeLayer(mapMarker);
+    }
+    const icon=L.divIcon({
+      html:`<div style="background:${p.status==='crit'?'#ef4444':'#0ea5e9'};width:36px;height:36px;border-radius:50%;
+        border:3px solid white;box-shadow:0 2px 8px #0003;display:flex;align-items:center;justify-content:center;
+        font-size:14px;color:white;font-weight:700;">${p.fn[0]}${p.ln[0]}</div>`,
+      iconSize:[36,36],iconAnchor:[18,18],className:''
+    });
+    mapMarker=L.marker([p.loc.lat,p.loc.lng],{icon})
+      .addTo(leafletMap)
+      .bindPopup(`<b>${p.fn} ${p.ln}</b><br>${p.ward} — ${p.bed} o'rin<br>${p.loc.addr}<br>
+        <span style="color:${p.status==='crit'?'#ef4444':p.status==='warn'?'#f97316':'#22c55e'};font-weight:600">
+        ${condLabel[p.status]}</span>`,{maxWidth:220})
+      .openPopup();
+    leafletMap.invalidateSize();
+  },100);
+}
+
+function closeMap(){
+  document.getElementById('map-modal').classList.remove('open');
+}
+document.getElementById('map-modal').addEventListener('click',e=>{
+  if(e.target===e.currentTarget) closeMap();
+});
+</script>
+</body>
+</html>
